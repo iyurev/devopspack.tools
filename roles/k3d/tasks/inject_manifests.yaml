@@ -1,0 +1,25 @@
+- name: Lookup local k8s manifest files
+  ansible.builtin.find:
+    paths: "{{ k3d_builtin_manifest_dir }}"
+    file_type: file
+    patterns: '*.yml,*.yaml'
+  register: k8s_manifests
+  delegate_to: 127.0.0.1
+
+- debug:
+    msg: "{{ k8s_manifests }}"
+
+- name: Create directory for additional manifests
+  ansible.builtin.file:
+        path: "{{ k3d_manifests_dir }}"
+        recurse: True
+        state: directory
+
+- name: Copy builtin k8s manifests to special directory to apply them while for cluster provisioning
+  copy:
+    src: "{{ manifest.path }}"
+    dest: "{{ k3d_manifests_dir }}/"
+    mode: '0644'
+  loop: "{{ k8s_manifests.files }}"
+  loop_control:
+    loop_var: manifest

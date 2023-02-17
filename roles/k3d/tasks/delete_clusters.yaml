@@ -1,0 +1,10 @@
+
+- name: Delete all clusters
+  ansible.builtin.shell: "k3d cluster delete --all"
+  register: delete_all_clusters_result
+  when: k3d_delete_all_clusters
+
+- name: Delete only this cluster
+  ansible.builtin.shell: "k3d cluster delete {{ k3d_cluster_name }}"
+  register: delete_this_clusters_result
+  when: k3d_delete_cluster | bool == True and k3d_delete_all_clusters | bool == False

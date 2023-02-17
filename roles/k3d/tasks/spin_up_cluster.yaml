@@ -1,0 +1,70 @@
+- set_fact:
+    k3d_manifests_dir: "{{ ansible_user_dir }}/k3d_{{ k3d_cluster_name }}_manifests"
+    k3d_cluster_conf: "{{ ansible_user_dir }}/k3d_{{ k3d_cluster_name }}.conf.yaml"
+
+- name: Inject advanced k8s manifests
+  include_tasks: inject_manifests.yaml
+  when: k3d_builtin_manifest_dir != ""
+
+#- set_fact:
+#     k3d_api_server_host: "{{ ansible_host | default(inventory_hostname) }}"
+#
+#- set_fact:
+#    k3d_api_port: "{{ k3d_api_server_host }}:{{ k3d_api_server_port }}"
+#
+#- debug:
+#    msg: "{{ k3d_api_server_host }}"
+#
+#- set_fact:
+#     k3d_args_create_cluster: "{{ k3d_args_create_cluster + [ '--port',  '{{ k3d_ingress_http_port }}:80@loadbalancer', '--port', '{{ k3d_ingress_https_port }}:443@loadbalancer' ] }}"
+#  when: k3d_ingress_exposed
+#
+#- set_fact:
+#    k3d_args_create_cluster: "{{ k3d_args_create_cluster + ['-v', '{{ k3d_manifests_dir }}:/var/lib/rancher/k3s/server/manifests/additional@server:0'] }}"
+#
+#- set_fact:
+#    k3d_args_create_cluster: "{{ k3d_args_create_cluster + [ '--api-port', k3d_api_port ] }}"
+
+
+- name: Rendering cluster config
+  ansible.builtin.template:
+    src: config.yaml
+    dest: "{{ k3d_cluster_conf }}"
+  register: cluster_conf
+
+- name: Composing K3D commands
+  set_fact:
+    list_clusters_cmd: "{{ ([k3d_cmd] + k3d_args_list_clusters) | list | join(' ') }}"
+    create_cluster_cmd: "{{ ([k3d_cmd] + [k3d_cluster_name, '--config', k3d_cluster_conf]) | list | join(' ') }}"
+    write_kubeconfig_cmd: "{{ ([k3d_cmd] + k3d_args_write_kubeconfig + [k3d_cluster_name]) | list | join(' ') }}"
+
+- name: Check if cluster already exists
+  ansible.builtin.shell: "{{ list_clusters_cmd }}"
+  register: list_clusters_result
+  changed_when: False
+
+- set_fact:
+    existing_clusters: "{{list_clusters_result.stdout | from_json | json_query('[].name') }}"
+
+- block:
+  - name: Create new cluster
+    ansible.builtin.shell: "{{ create_cluster_cmd }}"
+    register: k3d_create_cluster
+  when: k3d_cluster_name not in existing_clusters
+
+- name: Write k8s cluster kubeconfig and pull it to this workstation
+  block:
+    - name: Catch cluster kubeconfig
+      shell: "{{ write_kubeconfig_cmd }}"
+      register: write_kubeconfig_result
+
+    - name: New kubeconfig file path on the agent
+      set_fact:
+        new_kubeconfig_path: "{{ write_kubeconfig_result.stdout }}"
+
+    - name: Copy new cluster kubeconfig to controller
+      ansible.builtin.fetch:
+        src: "{{ new_kubeconfig_path }}"
+        dest: "{{ local_kubeconfig_path }}"
+        flat: True
+

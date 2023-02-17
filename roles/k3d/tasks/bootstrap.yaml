@@ -1,0 +1,19 @@
+---
+- name: Check if K3D already installed
+  ansible.builtin.shell: "k3d version"
+  changed_when: false
+  register: run_k3d_version
+
+- debug:
+    msg: "{{ run_k3d_version }}"
+
+- set_fact:
+    k3d_need_to_install: True
+  when: run_k3d_version.rc | int  !=  0
+
+- name: Download and install K3D binary
+  ansible.builtin.get_url:
+    url: "https://github.com/k3d-io/k3d/releases/download/v{{k3d_version}}/k3d-{{ ansible_os_family | lower}}-{{ ansible_architecture }}"
+    dest: "{{ k3d_install_dir }}/{{ k3d_binary_name }}"
+    mode: '0750'
+  when: k3d_need_to_install

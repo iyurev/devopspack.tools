@@ -1,0 +1,9 @@
+- name: Test k3d dev cluster role
+  #  hosts: localhost
+  #  connection: local
+  hosts: "{{ hosts }}"
+  tasks:
+    - include_role:
+        name: k3d
+#      vars:
+#        k3d_builtin_manifest_dir: "{{ playbook_dir }}/manifests"

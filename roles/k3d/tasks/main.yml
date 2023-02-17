@@ -1,0 +1,7 @@
+---
+- include_tasks: bootstrap.yaml
+- include_tasks: delete_clusters.yaml
+
+- include_tasks: spin_up_cluster.yaml
+  when: k3d_delete_cluster | bool  == False and k3d_delete_all_clusters | bool == False
+
